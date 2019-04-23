@@ -41,7 +41,7 @@ Rectangle {
         return suggestionsModel.count == 1 && suggestionsModel.get(0).name === filter
     }
 
-    visible: root.inputBoxFocus && suggestionsModel.count
+    visible: generalPageItems.inputBoxFocus && suggestionsModel.count
 
     onVisibleChanged: {
         if(visible){
