@@ -3,10 +3,7 @@ import QtQuick.Controls 2.2
 import QtPositioning 5.12
 import QtLocation 5.12
 import QtQuick.Layouts 1.3
-import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.plasma.components 2.0 as PlasmaComponents
 import org.kde.kirigami 2.5 as Kirigami
-import Mycroft 1.0 as Mycroft
 
 Mycroft.Delegate {
     id: root
@@ -21,10 +18,13 @@ Mycroft.Delegate {
     property var endCoordinate
     property var homeCoordinate
     property var geoCodeQueryType
-    property var mycroftLocationQuery: sessionData.locationQuery
     property bool isRouteError: false
     property bool isHomeSet: false
-
+    property bool platformPlasma: true
+    property var navigationBearingFirstPoint
+    property var navigationBearingSecondPoint
+    property var mycroftLocationQuery: sessionData.locationQuery
+    
     onMycroftLocationQueryChanged: {
         geoCodeQueryType = "General"
         geoCodeModel.query = mycroftLocationQuery
@@ -73,12 +73,12 @@ Mycroft.Delegate {
 
     function calculateRoute() {
         map.state = "Direction"
-        map.center = homeCoordinate;
+        map.center = homeCoordinate
         markerHome.coordinate = homeCoordinate
         markerEnd.coordinate = endCoordinate
-        map.zoomLevel = 14
+        //map.zoomLevel = 14
         closeAllOverlaySheets()
-        directionsSheet.open()
+        directionPageItems.directionSheetOpen()
     }
 
     function checkRouteHygineL1(){
@@ -88,6 +88,7 @@ Mycroft.Delegate {
         } else {
             setRoute()
             routeModel.update()
+            calculateRoute()
             console.log("InRouteHyginePassL1")
         }
     }
@@ -172,7 +173,7 @@ Mycroft.Delegate {
         generalPageItems.explorerMenu.close()
         placeSearchOverlaySheet.close()
         pinDropSelectionOverviewSheet.close()
-        directionsSheet.close()
+        directionPageItems.directionSheetClose()
     }
 
     function showPlaceOfInterest() {
@@ -220,30 +221,20 @@ Mycroft.Delegate {
         map.state = "Direction"
     }
 
-    PlasmaCore.DataSource {
-        id: geoDataSource
-        dataEngine: "geolocation"
-        property var coordinates
+    function goToNavigationState(){
+        map.state = "Navigation"
+        map.center = markerStart.coordinate
+        map.tilt = "70"
+        map.zoomLevel = "18"
+        updateInitialNavBearing()
+    }
 
-        onSourceAdded: {
-            connectSource(source)
-        }
+    function updateInitialNavBearing(){
+        map.bearing = navigationBearingFirstPoint.azimuthTo(navigationBearingSecondPoint)
+    }
 
-        onNewData: {
-            if (sourceName == "location"){
-                console.log(isHomeSet)
-                geoLat = data.latitude
-                geoLong = data.longitude
-                geoCountry = data.country
-                if (!isHomeSet){
-                    map.center = QtPositioning.coordinate(data.latitude, data.longitude)
-                    isHomeSet = true
-                }
-                coordinates = QtPositioning.coordinate(data.latitude, data.longitude)
-                root.homeCoordinate = QtPositioning.coordinate(data.latitude, data.longitude)
-                markerHome.coordinate = QtPositioning.coordinate(data.latitude, data.longitude)
-            }
-        }
+    Component.onCompleted: {
+        map.state = "General"
     }
 
     ListModel {
@@ -258,6 +249,11 @@ Mycroft.Delegate {
         id: autoCompleteListModelTo
     }
 
+    Loader {
+        id: geoDataProvider
+        source: platformPlasma ? "PositionProviderPlasma.qml" : "PositionProviderQt.qml"
+    }
+
     DropArea {
         anchors.fill: parent
         onDropped: {
@@ -266,7 +262,7 @@ Mycroft.Delegate {
         Map {
             id: map
             width: root.width
-            height: directionsSheet.position == 0 ? root.height : root.height / 1
+            height: directionPageItems.directionSheetPosition ? root.height : root.height / 1
             tilt: 0
             activeMapType: supportedMapTypes[0]
             plugin: Plugin {
@@ -320,18 +316,36 @@ Mycroft.Delegate {
                     name: "General"
                     PropertyChanges {target: generalPageItems; visible: true; enabled: true}
                     PropertyChanges {target: directionPageItems; visible: false; enabled: false}
+                    PropertyChanges {target: navigationPageItems; visible: false; enabled: false}
                 },
                 State {
                     name: "Direction"
                     PropertyChanges {target: directionPageItems; visible: true; enabled: true}
                     PropertyChanges {target: generalPageItems; visible: false; enabled: false}
+                    PropertyChanges {target: navigationPageItems; visible: false; enabled: false}
                 },
                 State {
                     name: "Navigation"
                     PropertyChanges {target: directionPageItems; visible: false; enabled: false}
                     PropertyChanges {target: generalPageItems; visible: false; enabled: false}
+                    PropertyChanges {target: navigationPageItems; visible: true; enabled: true}
                 }
             ]
+
+            MapQuickItem {
+                id: drivePointerStart
+                coordinate: startCoordinate
+                visible: map.state == "Navigation"
+                sourceItem: Rectangle {
+                    id: bearingLocIcon
+                    //source: "upindicator"
+                    width: Kirigami.Units.iconSizes.medium
+                    height: Kirigami.Units.iconSizes.medium
+                    color: Kirigami.Theme.backgroundColor
+                }
+                anchorPoint.x: bearingLocIcon.width / 2
+                anchorPoint.y: bearingLocIcon.height
+            }
 
             MapQuickItem {
                 id: markerHome
@@ -378,7 +392,6 @@ Mycroft.Delegate {
 
             MapItemView {
                 id: markerPlaces
-                autoFitViewport: true
                 model: placeSearchModel
                 z: 10
                 delegate: MapQuickItem {
@@ -469,7 +482,13 @@ Mycroft.Delegate {
             DirectionsExplorer {
                 id: directionPageItems
                 anchors.fill: parent
-                visible: map.state == "Direction" ? true : false
+                //visible: map.state == "Direction" ? true : false
+                z: 100
+            }
+
+            NavigationExplorer {
+                id: navigationPageItems
+                anchors.fill: parent
                 z: 100
             }
 
@@ -522,7 +541,7 @@ Mycroft.Delegate {
 
     Popup {
         id: pinDropSelectionOverviewSheet
-            parent: root
+            //parent: root
         x: (parent.width - width) / 2
         y: (parent.height - height) / 1
         closePolicy: Popup.CloseOnPressOutsideParent | Popup.CloseOnEscape
@@ -602,6 +621,9 @@ Mycroft.Delegate {
         }
         query: RouteQuery {
             id: routeQuery
+
+            onQueryDetailsChanged: {
+            }
         }
 
         onErrorStringChanged: {
@@ -623,12 +645,13 @@ Mycroft.Delegate {
                     routeInfoModel.append({
                                               "instruction": routeModel.get(0).segments[i].maneuver.instructionText,
                                               "distance": formatDistance(routeModel.get(0).segments[i].maneuver.distanceToNextInstruction),
-                                              "latitude": routeModel.get(0).segments[i].maneuver.waypoint.latitude,
-                                              "longitude": routeModel.get(0).segments[i].maneuver.waypoint.longitude,
+                                              "latitude": routeModel.get(0).segments[i].maneuver.position.latitude,
+                                              "longitude": routeModel.get(0).segments[i].maneuver.position.longitude,
                                               "turn": routeModel.get(0).segments[i].maneuver.extendedAttributes.modifier,
-                                              "turnType": routeModel.get(0).segments[i].maneuver.extendedAttributes.type
+                                              "turnType": routeModel.get(0).segments[i].maneuver.extendedAttributes.type,
+                                              "direction": routeModel.get(0).segments[i].maneuver.direction
                                           });
-                    //console.log(JSON.stringify(routeModel.get(0).segments[i].maneuver))
+                    //console.log(JSON.stringify(routeModel.get(0).segments[i]))
                 }
                 if (map.state == "General"){
                     calculateRoute()
@@ -638,6 +661,8 @@ Mycroft.Delegate {
             }
             routeInfoModel.travelTime = routeModel.count == 0 ? "" : formatTime(routeModel.get(0).travelTime)
             routeInfoModel.distance = routeModel.count == 0 ? "" : formatDistance(routeModel.get(0).distance)
+            root.navigationBearingFirstPoint = routeModel.count == 0 ? "" : QtPositioning.coordinate(routeModel.get(0).segments[0].maneuver.position.latitude, routeModel.get(0).segments[0].maneuver.position.longitude)
+            root.navigationBearingSecondPoint = routeModel.count == 0 ? "" : QtPositioning.coordinate(routeModel.get(0).segments[0].maneuver.position.latitude, routeModel.get(0).segments[1].maneuver.position.longitude)
         }
     }
 
@@ -647,7 +672,7 @@ Mycroft.Delegate {
         property string distance
     }
 
-    Kirigami.OverlayDrawer {
+    /**Kirigami.OverlayDrawer {
         id: directionsSheet
         edge: Qt.BottomEdge
         height: root.height / 3
@@ -676,8 +701,10 @@ Mycroft.Delegate {
                     }
                 }
                 onPressed: {
+                    console.log(model.latitude)
+                    console.log(model.longitude)
                     map.center = QtPositioning.coordinate(model.latitude, model.longitude)
-                    map.zoomLevel = 17
+                    map.zoomLevel = 18
                 }
             }
 
@@ -685,7 +712,7 @@ Mycroft.Delegate {
                 active: true
             }
         }
-    }
+    }**/
 
     Kirigami.OverlaySheet {
         id: errorInfoSheet

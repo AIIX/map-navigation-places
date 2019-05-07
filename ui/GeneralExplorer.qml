@@ -27,6 +27,8 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: Kirigami.Units.largeSpacing
         height: Kirigami.Units.gridUnit * 3
+        Kirigami.Theme.inherit: false
+        Kirigami.Theme.colorSet: Kirigami.Theme.Complementary
         color: Kirigami.Theme.backgroundColor
         radius: 10
         property bool open: false
@@ -316,7 +318,7 @@ Item {
         Kirigami.Theme.colorSet: Kirigami.Theme.Complementary
         flat: true
         hoverEnabled: true
-        visible: directionsSheet.position ? 0 : 1
+        visible: generalPageItems.directionSheetPosition ? 0 : 1
         z: 100
         contentItem: RowLayout {
             anchors.fill: parent

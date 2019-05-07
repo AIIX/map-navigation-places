@@ -14,6 +14,15 @@ Item {
     property alias inputBoxFromText: inputQueryFrom.text
     property alias inputBoxToFocus: inputQueryTo.focus
     property alias inputBoxToText: inputQueryTo.text
+    property alias directionSheetPosition: directionsSheet.opened
+
+    function directionSheetOpen(){
+        directionsSheet.open()
+    }
+
+    function directionSheetClose(){
+        directionsSheet.close()
+    }
 
     z: 100
 
@@ -185,7 +194,7 @@ Item {
         height: Kirigami.Units.iconSizes.huge
         visible: routeModel.status == RouteModel.Ready
         onClicked: {
-            goToGeneralState()
+            goToNavigationState()
         }
         Kirigami.Icon {
             id: iconFocusTypeNavigation
@@ -238,7 +247,7 @@ Item {
         Kirigami.Theme.colorSet: Kirigami.Theme.Complementary
         width: Kirigami.Units.iconSizes.huge
         height: Kirigami.Units.iconSizes.huge
-        visible: routeModel.status == RouteModel.Ready && directionsSheet.position == 0 ? true : false
+        visible: routeModel.status == RouteModel.Ready && directionsSheet._isVisible == false ? true : false
         onClicked: directionsSheet.open()
         Kirigami.Icon {
             id: iconDirectionType
@@ -248,5 +257,31 @@ Item {
             height: Kirigami.Units.iconSizes.medium
         }
         z: 2
+    }
+
+    PulleyItem {
+        id: directionsSheet
+        model: routeInfoModel
+        barColor: Kirigami.Theme.backgroundColor
+        delegate: Kirigami.BasicListItem {
+            RowLayout {
+                Layout.preferredWidth: parent.width
+                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                spacing: 10
+                Label { text: (1 + index) + "." }
+                Label {
+                    text: model.instruction
+                }
+                Label{
+                    text: model.distance
+                }
+            }
+            onPressed: {
+                console.log(model.latitude)
+                console.log(model.longitude)
+                map.center = QtPositioning.coordinate(model.latitude, model.longitude)
+                map.zoomLevel = 18
+            }
+        }
     }
 }
